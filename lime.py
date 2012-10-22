@@ -18,6 +18,18 @@
 import sys, struct, string
 
 
+def hexdump(line):
+    def format_char(c):
+        if c in string.whitespace:
+            return '_'
+        elif c not in string.printable:
+            return '.'
+        else:
+            return c
+    print " ".join(format_char(c) for c in line)
+    print "".join('%02x' % ord(c) for c in line)
+
+
 def read_chunk(handle, level=0):
     chunk_id = handle.read(4)
     chunk_length = struct.unpack('i', handle.read(4))[0]
@@ -29,7 +41,7 @@ def read_chunk(handle, level=0):
 
     data_start = handle.tell()
 
-    # print '    '*level, chunk_id, '({})'.format(chunk_type) if chunk_type else ''
+    print '    '*level, chunk_id, '({})'.format(chunk_type) if chunk_type else ''
 
     if chunk_type or chunk_id == 'MxSt':
         data = []
@@ -51,22 +63,16 @@ def read_chunk(handle, level=0):
 
         if data[idx] != '\0': # there is a group
             group, idx = read_cstr(data, idx)
+            print group,
 
         idx += 5
         label, idx = read_cstr(data, idx)
 
-        print group, label
+        print label
+        hexdump(data[idx:70+idx])
 
-        line = data[idx:70]
-        def format_char(c):
-            if c in string.whitespace:
-                return '_'
-            elif c not in string.printable:
-                return '.'
-            else:
-                return c
-        print " ".join(format_char(c) for c in line)
-        print "".join('%02x' % ord(c) for c in line)
+    if chunk_id == 'MxCh':
+        hexdump(data[:70])
 
     if chunk_length % 2 != 0: # eat pad byte
         handle.read(1)
