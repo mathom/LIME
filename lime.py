@@ -17,6 +17,7 @@
 
 import sys, struct, string
 
+
 def read_chunk(handle, level=0):
     chunk_id = handle.read(4)
     chunk_length = struct.unpack('i', handle.read(4))[0]
@@ -28,27 +29,22 @@ def read_chunk(handle, level=0):
 
     data_start = handle.tell()
 
-    # print '    '*level, chunk_id, chunk_length, chunk_type
+    print '    '*level, chunk_id, chunk_length, chunk_type
 
-    if chunk_type:
+    if chunk_type or chunk_id == 'MxSt':
         data = []
         while handle.tell() - data_start < chunk_length:
+            before = handle.tell()
             subchunk = read_chunk(handle, level+1)
+            print 'read subchunk at', before, 'to', handle.tell()
             data.append(subchunk[3])
     else:
         data = handle.read(chunk_length)
 
-    if chunk_id == 'MxSt':
-        prev = data[:min(100, chunk_length)]
-        name = prev[:4]
-        length = struct.unpack('i', prev[4:8])[0]
-        # data = data[8:]
-        print name, length
-        # print 'num of Mx', data.count('MxOb')
         line = data[:70]
         def format_char(c):
             if c in string.whitespace:
-                return ' '
+                return '_'
             elif c not in string.printable:
                 return '.'
             else:
@@ -56,6 +52,8 @@ def read_chunk(handle, level=0):
         print " ".join(format_char(c) for c in line)
         print "".join('%02x' % ord(c) for c in line)
 
+    if chunk_length % 2 != 0: # eat pad byte
+        handle.read(1)
 
     return chunk_id, chunk_length, chunk_type, data
 
