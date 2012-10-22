@@ -15,148 +15,59 @@
 # You should have received a copy of the GNU General Public License
 # along with LIME.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, struct, wave
-from StringIO import StringIO
+import sys, struct, string
 
-PREFIX = ''
+def read_chunk(handle, level=0):
+    chunk_id = handle.read(4)
+    chunk_length = struct.unpack('i', handle.read(4))[0]
+    chunk_type = None
 
-class Chunk(object):
-    def __init__(self, file, datacallback=None, debug=False):
-        self.debug = debug
-        self.datacallback = datacallback
-    
-        self.name = file.read(4)
-        self.size = struct.unpack('<I', file.read(4))[0]
+    if chunk_id in ('RIFF', 'LIST'):
+        chunk_type = handle.read(4)
+        chunk_length -= 4
 
-        if debug:
-            print PREFIX + "Read: " + self.name + " size " + str(self.size)
-        
-        self.data = []
-        
-        self.children = []
-        self.header = None
-        if self.name == 'LIST':
-            self.header = file.read(4)
-            self.read_children(file, self.size)
-        elif datacallback:
-            datacallback(self, file)
-        else:
-            file.seek(self.size, 1)
-            
-    def read_children(self, file, stop):
-        start = file.tell()
-        global PREFIX
-        PREFIX += "\t"
-        while file.tell() < stop-start:
-            self.children.append(Chunk(file, self.datacallback, self.debug))
-        PREFIX = PREFIX[:-1]
-        
-    def __repr__(self):
-        return "Chunk %s (size %d) (%d children)" % (
-            self.name, self.size, len(self.children)
-        )
-        
+    data_start = handle.tell()
 
-        
-class RIFF(object):
-    def __init__(self, file, datacallback=None, debug=False):
-        assert file.read(4) == 'RIFF'
-        self.size = struct.unpack('<I', file.read(4))[0] # total file size
-        self.name = file.read(4) # should be 'OMNI'
-        assert self.name == 'OMNI'
-        
-        self.children = []
-        while file.tell() < self.size + 4:
-            self.children.append(Chunk(file, datacallback, debug))
-    
+    # print '    '*level, chunk_id, chunk_length, chunk_type
 
-def read_cstring(file):
-    s = StringIO()
-    c = ''
-    while c != '\0':
-        s.write(c)
-        c = file.read(1)
-    return s.getvalue()
-    
-    
-def attacher(self, file):
-    """Attaches blob data to the chunk in string form."""
-    self.data = StringIO(file.read(self.size))
-    
-    
-def dumper(self, file):
-    global NUM
-    blob = file.read(self.size)
+    if chunk_type:
+        data = []
+        while handle.tell() - data_start < chunk_length:
+            subchunk = read_chunk(handle, level+1)
+            data.append(subchunk[3])
+    else:
+        data = handle.read(chunk_length)
 
-    if blob.find(' WAV') != -1:
-        listbegin = blob.find('LIST')
-        idblock = StringIO(blob[:listbegin])
+    if chunk_id == 'MxSt':
+        prev = data[:min(100, chunk_length)]
+        name = prev[:4]
+        length = struct.unpack('i', prev[4:8])[0]
+        # data = data[8:]
+        print name, length
+        # print 'num of Mx', data.count('MxOb')
+        line = data[:70]
+        def format_char(c):
+            if c in string.whitespace:
+                return ' '
+            elif c not in string.printable:
+                return '.'
+            else:
+                return c
+        print " ".join(format_char(c) for c in line)
+        print "".join('%02x' % ord(c) for c in line)
 
-        idblock.seek(15,1)
-        name = read_cstring(idblock)
-        #print 'WAV "%s" detected!' % name
-        
-        #out = open("%s.bin" % name, 'wb')
-        #out.write(blob)
-        #out.close()
-        
-        blob = StringIO(blob[listbegin:])
-        audiolist = Chunk(blob, attacher)
-        
-        process_audio(name, audiolist.children)
-        
 
-def process_header(chunk):
-    data = chunk.data 
-    
-    data.seek(18,1)
-    bitrate1 = struct.unpack('<H', data.read(2))[0]
-    data.seek(2,1)
-    bitrate2 = struct.unpack('<H', data.read(2))[0]
-    data.seek(2,1)
-    idk = struct.unpack('<H', data.read(2))[0]
-    bits = struct.unpack('<H', data.read(2))[0]
-    
-    print "audio format might be %dHz or %dHz, with %d bits" % (
-        bitrate1, bitrate2, bits
-    )
-    
-    return {'sampwidth': bits/8, 'channels': 1, 'framerate': bitrate1}
-    
+    return chunk_id, chunk_length, chunk_type, data
 
-def process_audio(name, chunks):
-    junk = 0
-    valid = 0
-    
-    head = chunks[0]
-    wavinfo = process_header(head)
 
-    print "Writing %s.wav" % name
-    out = wave.open("%s.wav" % name, 'wb')
-    out.setnchannels(wavinfo['channels'])
-    out.setframerate(wavinfo['framerate'])
-    out.setsampwidth(wavinfo['sampwidth'])
-   
-    for chunk in chunks[1:]:
-        if chunk.name == 'MxCh':
-            valid += 1
-            chunk.data.seek(14,0)
-            out.writeframes(chunk.data.read())
-        else:
-            junk += 1
-            
-    out.close()
-    print "\tstats: %d valid, %d junk" % (valid, junk)
-        
-    
 if __name__=='__main__':
     try: 
         filename = sys.argv[1]
     except:
         print "Usage: %s file.si" % sys.argv[0]
         raise SystemExit
-        
+
     print "Reading %s" % filename
     print "-"*40
-    
-    RIFF(open(filename, 'rb'), dumper, debug=True)
+
+    read_chunk(open(filename, 'rb'))
