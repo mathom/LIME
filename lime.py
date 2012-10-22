@@ -29,19 +29,35 @@ def read_chunk(handle, level=0):
 
     data_start = handle.tell()
 
-    print '    '*level, chunk_id, chunk_length, chunk_type
+    # print '    '*level, chunk_id, '({})'.format(chunk_type) if chunk_type else ''
 
     if chunk_type or chunk_id == 'MxSt':
         data = []
         while handle.tell() - data_start < chunk_length:
-            before = handle.tell()
             subchunk = read_chunk(handle, level+1)
-            print 'read subchunk at', before, 'to', handle.tell()
             data.append(subchunk[3])
     else:
         data = handle.read(chunk_length)
 
-        line = data[:70]
+    if chunk_id == 'MxOb':
+        idx = 2
+        group = None
+
+        def read_cstr(d, i):
+            start = i
+            while d[i] != '\0':
+                i += 1
+            return d[start:i], i
+
+        if data[idx] != '\0': # there is a group
+            group, idx = read_cstr(data, idx)
+
+        idx += 5
+        label, idx = read_cstr(data, idx)
+
+        print group, label
+
+        line = data[idx:70]
         def format_char(c):
             if c in string.whitespace:
                 return '_'
