@@ -16,7 +16,12 @@
 # along with LIME.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, struct, wave
-from StringIO import StringIO
+try:
+    # Python 2 import
+    from StringIO import StringIO
+except ImportError:
+    # Python 3 import
+    import io.StringIO as StringIO
 
 PREFIX = ''
 
@@ -29,7 +34,7 @@ class Chunk(object):
         self.size = struct.unpack('<I', file.read(4))[0]
 
         if debug:
-            print PREFIX + "Read: " + self.name + " size " + str(self.size)
+            sys.stdout.write(PREFIX + "\nRead: " + self.name + " size " + str(self.size))
         
         self.data = []
         
@@ -117,9 +122,9 @@ def process_header(chunk):
     idk = struct.unpack('<H', data.read(2))[0]
     bits = struct.unpack('<H', data.read(2))[0]
     
-    print "audio format might be %dHz or %dHz, with %d bits" % (
+    sys.stdout.write("\nAudio format might be %dHz or %dHz, with %d bits\n" % (
         bitrate1, bitrate2, bits
-    )
+    ))
     
     return {'sampwidth': bits/8, 'channels': 1, 'framerate': bitrate1}
     
@@ -131,7 +136,7 @@ def process_audio(name, chunks):
     head = chunks[0]
     wavinfo = process_header(head)
 
-    print "Writing %s.wav" % name
+    sys.stdout.write("\nWriting %s.wav\n" % name)
     out = wave.open("%s.wav" % name, 'wb')
     out.setnchannels(wavinfo['channels'])
     out.setframerate(wavinfo['framerate'])
@@ -146,17 +151,17 @@ def process_audio(name, chunks):
             junk += 1
             
     out.close()
-    print "\tstats: %d valid, %d junk" % (valid, junk)
+    print "stats: %d valid, %d junk" % (valid, junk)
         
     
 if __name__=='__main__':
     try: 
         filename = sys.argv[1]
     except:
-        print "Usage: %s file.si" % sys.argv[0]
+        sys.stdout.write("\nUsage: %s file.si\n" % sys.argv[0])
         raise SystemExit
         
-    print "Reading %s" % filename
-    print "-"*40
+    sys.stdout.write("\nReading %s" % filename)
+    sys.stdout.write("\n" + "-" * 40 + "\n")
     
     RIFF(open(filename, 'rb'), dumper, debug=True)
