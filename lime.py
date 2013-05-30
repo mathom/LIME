@@ -108,8 +108,10 @@ def dumper(self, file):
         blob = StringIO(blob[listbegin:])
         audiolist = Chunk(blob, attacher)
         
-        process_audio(name, audiolist.children)
-        
+        try:
+            process_audio(name, audiolist.children)
+        except wave.Error as e:
+            sys.stdout.write('skipping\n')
 
 def process_header(chunk):
     data = chunk.data 
