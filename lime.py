@@ -17,6 +17,7 @@
 # along with LIME.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+import os
 import struct
 import wave
 from StringIO import StringIO
@@ -136,6 +137,10 @@ def process_audio(name, chunks):
     head = chunks[0]
     wavinfo = process_header(head)
 
+    # Change the working directory to extract_path
+    # so everything will extract to that location
+    os.chdir(extract_path)
+
     print "\nWriting %s.wav\n" % name
     out = wave.open("%s.wav" % name, 'wb')
     out.setnchannels(wavinfo['channels'])
@@ -152,6 +157,27 @@ def process_audio(name, chunks):
 
     out.close()
     print "stats: %d valid, %d junk" % (valid, junk)
+
+
+def FolPath(filename):
+    '''Sets the extraction path for the SI archive.
+    Works for both absolute and relative paths'''
+
+    # The folder name to extract the files to
+    foldername = os.path.dirname(sys.argv[0])
+
+    # The base filename (minus .SI)
+    basefilename = os.path.basename(filename[:-3])
+
+    # The complete location to extract the files to
+    extract_path = os.path.join(foldername, basefilename)
+
+    # If the folder does not exists, make it
+    if not os.path.exists(extract_path):
+        os.mkdir(extract_path)
+
+    # Send back the path
+    return extract_path
 
 
 def main():
@@ -185,7 +211,7 @@ def main():
     )
 
     # The user clicked the cancel button
-    if len(filename) == 0:
+    if not filename:
 
         # Give focus back to console window
         root.destroy()
@@ -194,15 +220,19 @@ def main():
 Press Enter to close LIME.\n''')
         raise SystemExit
 
-    # The user selected a patch
+    # The user selected an archive
     else:
 
         # Give focus back to console window
         root.destroy()
 
         # Display intro text
-        print "\nReading %s" % filename
-        print "\n" + "-" * 40 + "\n"
+        print "\nReading {0}".format(filename)
+        print "\n{0}\n".format("-" * 40)
+
+        # Run process to get the extraction path
+        global extract_path
+        extract_path = FolPath(filename)
 
         # Send archive to extractor
         RIFF(open(filename, 'rb'), dumper, debug=True)
@@ -210,6 +240,13 @@ Press Enter to close LIME.\n''')
 if __name__ == "__main__":
     try:
         filename = sys.argv[1]
+
+        # Run process to get the extraction path
+        extract_path = FolPath(filename)
+
+        # Display intro text
+        print "\nReading {0}".format(filename)
+        print "\n{0}\n".format("-" * 40)
 
         # Send archive to extractor
         RIFF(open(filename, 'rb'), dumper, debug=True)
