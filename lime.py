@@ -104,13 +104,6 @@ def dumper(self, file):
 
         blob = StringIO(blob[listbegin:])
         audiolist = Chunk(blob, attacher)
-<<<<<<< HEAD
-        
-        try:
-            process_audio(name, audiolist.children)
-        except wave.Error as e:
-            sys.stdout.write('skipping\n')
-=======
 
         try:
             process_audio(name, audiolist.children)
@@ -118,7 +111,6 @@ def dumper(self, file):
         except Exception:
             print "Skipping...\n"
 
->>>>>>> Changed exception to catch all errors, allowing more audio to be pulled out,
 
 def process_header(chunk):
     data = chunk.data
