@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with LIME.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, struct, string
+import os
+import string
+import struct
+import sys
 
 
 def hexdump(line):
@@ -30,7 +33,15 @@ def hexdump(line):
     print "".join('%02x' % ord(c) for c in line)
 
 
-def read_chunk(handle, level=0):
+TYPES = {
+    4: 'sound',
+    7: 'movie',
+    8: 'image',
+    11: 'animation'
+}
+
+
+def read_chunk(handle, level=0, callback=None):
     chunk_id = handle.read(4)
     chunk_length = struct.unpack('i', handle.read(4))[0]
     chunk_type = None
@@ -41,7 +52,8 @@ def read_chunk(handle, level=0):
 
     data_start = handle.tell()
 
-    print '    '*level, chunk_id, '({})'.format(chunk_type) if chunk_type else ''
+    # print '    '*level, chunk_id, '({0})'.format(chunk_type) if chunk_type else ''
+    # print '    '*level, data_start
 
     if chunk_type or chunk_id == 'MxSt':
         data = []
@@ -52,6 +64,7 @@ def read_chunk(handle, level=0):
         data = handle.read(chunk_length)
 
     if chunk_id == 'MxOb':
+        chunk_content = ord(data[0])
         idx = 2
         group = None
 
@@ -68,16 +81,22 @@ def read_chunk(handle, level=0):
         idx += 5
         label, idx = read_cstr(data, idx)
 
-        print label
-        hexdump(data[idx:70+idx])
+        content_label = TYPES.get(chunk_content, 'unknown:{0}'.format(chunk_content))
+        print '{0} "{1}"'.format(content_label, label)
+        #hexdump(data[idx:80+idx])
 
     if chunk_id == 'MxCh':
-        hexdump(data[:70])
+        pass
+        #hexdump(data[:70])
 
     if chunk_length % 2 != 0: # eat pad byte
         handle.read(1)
 
     return chunk_id, chunk_length, chunk_type, data
+
+
+def write_file(chunk_id, title, content):
+    print chunk_id, title
 
 
 if __name__=='__main__':
@@ -90,4 +109,12 @@ if __name__=='__main__':
     print "Reading %s" % filename
     print "-"*40
 
-    read_chunk(open(filename, 'rb'))
+    in_file = open(filename, 'rb')
+
+    dirname = os.path.splitext(filename)[0]
+    if not os.path.exists(dirname):
+        os.mkdir(dirname)
+
+    os.chdir(dirname)
+
+    read_chunk(in_file, callback=write_file)
