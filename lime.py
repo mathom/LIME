@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # LIME Copyright (C) 2011 Matthew Thompson, Nick Thompson
 #
 # This file is part of LIME.
@@ -48,18 +49,23 @@ def assert_empty(data, crash=True):
             hexdump(data)
             if crash:
                 raise AssertionError
+            return
 
 
-def assert_equals(a, b):
+def assert_equals(a, b, crash=True):
     if a != b:
         hexdump(a)
         print 'is not equal to'
         hexdump(b)
-        raise AssertionError
+        if crash:
+            raise AssertionError
 
 
 TYPES = {
     0x07: 'list_head',
+    0x0a: 'bitmap',
+    0x04: 'sound',
+    0x0b: 'texture'
 }
 
 FLAG_TAGGED = 0x20
@@ -80,29 +86,52 @@ def read_object(handle, seek, level=0, callback=None):
 
     label = read_cstr(handle)
 
-    content_label = TYPES.get(chunk_content, 'unknown:{0}'.format(chunk_content))
+    content_label = TYPES.get(chunk_content, 'unknown:{0:x}'.format(chunk_content))
     print '{0} {1} "{2}" "{3}"'.format('->'*level, content_label, group, label)
 
-    if TYPES.get(chunk_content) == 'list_head':
-        alpha, beta = struct.unpack('ii', handle.read(8))
+    content_type = TYPES.get(chunk_content, 'unknown:{0}'.format(chunk_content))
 
-        assert_empty(handle.read(8))
+    if content_type in ('list_head', 'bitmap'):
+        alpha, flags = struct.unpack('ii', handle.read(8))
+
+        assert_empty(handle.read(4))
+        mask = handle.read(4)
+        if mask not in ('\0'*4, '\xff'*4):
+            hexdump(mask)
 
         gamma = struct.unpack('i', handle.read(4))[0]
 
-        assert_empty(handle.read(46), crash=False) #TODO
+        assert_empty(handle.read(46), crash=False)
 
-        assert_equals(handle.read(16), '\xf0\x3f' + '\0'*14)
+        assert_equals(handle.read(16), '\xf0\x3f' + '\0'*14, crash=False)
 
-        assert_equals(handle.read(10), '\xf0\x3f' + '\0'*8)
+        assert_equals(handle.read(10), '\xf0\x3f' + '\0'*8, crash=False)
 
-        print '{0} alpha = {1:x} {1:b}\n{0} beta = {2:x} {2:b}'.format('  '*level, alpha, beta)
-        if beta & FLAG_TAGGED:
+        print '{0} alpha = {1:x} {1:b}'.format('  '*level, alpha)
+        print '{0} flags = {1:x} {1:b}'.format('  '*level, flags)
+        print '{0} gamma = {1:x} {1:b}'.format('  '*level, gamma)
+
+        if flags & FLAG_TAGGED:
             count = struct.unpack('h', handle.read(2))[0]
+            print '  '*level, 'count', count
             if count != 0:
                 tags = read_cstr(handle)
                 print '  '*level, 'tags', tags
+            else:
+                print '  '*level, 'no tags described'
 
+    if content_type in ('bitmap'):
+        path = read_cstr(handle)
+        print '  '*level, 'path', path
+        assert_empty(handle.read(8))
+        unknown = struct.unpack('i', handle.read(4))[0]
+        print '{0} unknown = {1:x} {1:b}'.format('  '*level, unknown)
+        offset = struct.unpack('i', handle.read(4))[0]
+        print '{0} offset = {1:x} {1:b}'.format('  '*level, offset)
+        unknown = struct.unpack('i', handle.read(4))[0]
+        print '{0} unknown = {1:x} {1:b}'.format('  '*level, unknown)
+
+    if content_type == 'list_head':
         print '{0} internal chunk at {1:x}'.format('  '*level, handle.tell())
         read_chunk(handle, handle.tell(), level=level+1, callback=callback)
 
