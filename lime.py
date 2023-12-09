@@ -1,5 +1,5 @@
 #! /usr/bin/python
-# LIME Copyright (C) 2011 Matthew Thompson, Nick Thompson
+# LIME Copyright (C) 2023 Matthew Thompson, Nick Thompson
 #
 # This file is part of LIME.
 #
